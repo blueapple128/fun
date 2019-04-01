@@ -4,9 +4,8 @@ from sha256 import sha256
 
 """
 Given two directories of arbitrary size and depth, output all files that are
-different between the two directories. Use for all those cases where folders
-may have been duplicated in the past and now have diverged. Alternatively, use
-to compress multiples of manual backups.
+different between the two directories. Use for organization in all those cases
+where folders may have been duplicated in the past and now have diverged.
 """
 
 DELETE = True
