@@ -6,17 +6,18 @@ import time
 import sys
 import traceback
 
-BOT_TOKEN = os.environ['SLACK_BOT_TOKEN']
-SEARCH_TOKEN = os.environ['SLACK_SEARCH_TOKEN']
-BOT_ID = os.environ['SLACK_BOT_ID']
+BOT_TOKEN = os.environ['SIMULATORBOT_TOKEN']
+SEARCH_TOKEN = os.environ['SIMULATORBOT_SEARCH_TOKEN']
+BOT_ID = os.environ['SIMULATORBOT_ID']
 AT_BOT = "<@" + BOT_ID + ">"
+TXT_FILE = os.environ['SOURCE_TXT_FILE']
 
 
 class SimulatorBot(object):
   def __init__(self, vocab_file):
     self.cli = SlackClient(BOT_TOKEN)
     assert self.cli.rtm_connect()
-    self.bot_name = cli.api_call("users.info", user=BOT_ID)['user']['name']
+    self.bot_name = self.cli.api_call("users.info", user=BOT_ID)['user']['name']
     self.vocab_file = vocab_file
     self.counter = 0
     self.dict = {}
@@ -24,19 +25,31 @@ class SimulatorBot(object):
   def update_dict(self):
     self.dict = {None: []}
     
-    cli2 = SlackClient(MY_TOKEN)
+    cli2 = SlackClient(SEARCH_TOKEN)
     assert cli2.rtm_connect()
     pages = cli2.api_call("search.messages",
                           query="after:2012",
                           count=100)['messages']['paging']['pages']
     for p in range(1, pages+1):
-      msgs = cli2.api_call("search.messages",
-                           query="after:2012",
-                           count=100,
-                           page=p)['messages']['matches']
+      success = False
+      while not success:
+        print p, pages
+        try:
+          msgs = cli2.api_call("search.messages",
+                              query="after:2012",
+                              count=100,
+                              page=p)['messages']['matches']
+          success = True
+          time.sleep(3)
+        except Exception:
+          pass
+    
       for msg in msgs:
         words = msg['text'].split()
-        self.dict[None].append(words[0])
+        try:
+          self.dict[None].append(words[0])
+        except IndexError:
+          print `msg['text']`
         for i in range(len(words)):
           source_word = words[i]
           dest_word = words[i+1] if i+1 in range(len(words)) else None
@@ -94,4 +107,5 @@ class SimulatorBot(object):
 
 
 if __name__ == '__main__':
-  SimulatorBot(raw_input('Vocabulary source file: ')).run()
+  SimulatorBot(TXT_FILE).run()
+
