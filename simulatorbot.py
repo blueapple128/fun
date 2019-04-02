@@ -10,7 +10,7 @@ BOT_TOKEN = os.environ['SIMULATORBOT_TOKEN']
 SEARCH_TOKEN = os.environ['SIMULATORBOT_SEARCH_TOKEN']
 BOT_ID = os.environ['SIMULATORBOT_ID']
 AT_BOT = "<@" + BOT_ID + ">"
-TXT_FILE = os.environ['SOURCE_TXT_FILE']
+VOCAB_FILE = os.environ['VOCAB_FILE']
 
 
 class SimulatorBot(object):
@@ -24,6 +24,7 @@ class SimulatorBot(object):
   
   def update_dict(self):
     print 'Updating...'
+    self.post('Diagnostic message: Currently updating vocab file, bot will be down for about 30 seconds', "#random")
     self.dict = {None: []}
     
     cli2 = SlackClient(SEARCH_TOKEN)
@@ -70,6 +71,7 @@ class SimulatorBot(object):
     assert self.cli.rtm_connect()
     
     print 'Update done.'
+    self.post('Diagnostic message: Finished updating vocab file and bot is back up', "#random")
   
   def gen(self):
     with open(self.vocab_file, 'r') as f:
@@ -104,13 +106,17 @@ class SimulatorBot(object):
     print 'Running'
     while True:
       try:
+        # heroku ephemeral file support: if vocabulary doesn't exist, create it
+        if not os.path.isfile(self.vocab_file):
+          self.update_dict()
         for output in self.cli.rtm_read():
           if self.is_command(output):
             self.post(self.gen(), output['channel'], output['user'])
+            self.counter = 0
         time.sleep(1)
         self.counter += 1
-        if self.counter % 3600 == 0:
-          self.update_dict()
+        # if the bot hasn't posted in 6 hours
+        if self.counter % (3600*6) == 0:
           self.post(self.gen(), "#random")
       except Exception:
         traceback.print_exc()
@@ -118,5 +124,5 @@ class SimulatorBot(object):
 
 
 if __name__ == '__main__':
-  SimulatorBot(TXT_FILE).run()
+  SimulatorBot(VOCAB_FILE).run()
 
