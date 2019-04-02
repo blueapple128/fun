@@ -1,2 +1,3 @@
-bot: ruby piazzabot.rb
+piazzabot: ruby piazzabot.rb
+simulatorbot: python simulatorbot.py
 
