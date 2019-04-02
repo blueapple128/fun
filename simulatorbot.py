@@ -23,43 +23,53 @@ class SimulatorBot(object):
     self.dict = {}
   
   def update_dict(self):
+    print 'Updating...'
     self.dict = {None: []}
     
     cli2 = SlackClient(SEARCH_TOKEN)
     assert cli2.rtm_connect()
-    pages = cli2.api_call("search.messages",
-                          query="after:2012",
-                          count=100)['messages']['paging']['pages']
-    for p in range(1, pages+1):
-      success = False
-      while not success:
-        print p, pages
-        try:
-          msgs = cli2.api_call("search.messages",
-                              query="after:2012",
-                              count=100,
-                              page=p)['messages']['matches']
-          success = True
-          time.sleep(3)
-        except Exception:
-          pass
     
-      for msg in msgs:
-        words = msg['text'].split()
-        try:
-          self.dict[None].append(words[0])
-        except IndexError:
-          print `msg['text']`
-        for i in range(len(words)):
-          source_word = words[i]
-          dest_word = words[i+1] if i+1 in range(len(words)) else None
-          if source_word in self.dict:
-            self.dict[source_word].append(dest_word)
-          else:
-            self.dict[source_word] = [dest_word]
+    # todo: pagination-insensitive API call assumes there are no more than 100
+    # channels; works for this workspace but may not work for other workspaces
+    channels = cli2.api_call(
+      "conversations.list",
+      types="public_channel,private_channel,im")['channels']
+    channel_ids = [c['id'] for c in channels]
+    
+    for cid in channel_ids:
+      cursor = None
+      while True:
+        kwargs = {'channel': cid, 'count': 1000}
+        if cursor:
+          kwargs['cursor'] = cursor
+        history = cli2.api_call("conversations.history", **kwargs)
+        messages = history['messages']
+        for m in messages:
+          words = m['text'].split()
+          if words:  # e.g. uploaded image is a message w/o text
+            self.dict[None].append(words[0])
+          for i in range(len(words)):
+            source_word = words[i]
+            dest_word = words[i+1] if i+1 in range(len(words)) else None
+            if source_word in self.dict:
+              self.dict[source_word].append(dest_word)
+            else:
+              self.dict[source_word] = [dest_word]
+        if history['has_more']:
+          cursor = history['response_metadata']['next_cursor']
+        else:
+          break
+        time.sleep(1.2)  # slack rate limit (max 50 history calls per minute)
     
     with open(self.vocab_file, 'w') as f:
       f.write(str(self.dict))
+    
+    # patch: the websocket closes after being idle too long; sometimes the
+    # dictionary update takes long enough
+    self.cli = SlackClient(BOT_TOKEN)
+    assert self.cli.rtm_connect()
+    
+    print 'Update done.'
   
   def gen(self):
     with open(self.vocab_file, 'r') as f:
@@ -77,7 +87,7 @@ class SimulatorBot(object):
   def post(self, msg, channel, to_user=None):
     self.cli.api_call("chat.postMessage",
                  channel=channel,
-                 text=("<@" + to_user + "> " if to_user else "") + msg,
+                 text=msg,
                  as_user=True)
   
   def is_command(self, output):
@@ -91,8 +101,9 @@ class SimulatorBot(object):
       return False
   
   def run(self):
-    try:
-      while True:
+    print 'Running'
+    while True:
+      try:
         for output in self.cli.rtm_read():
           if self.is_command(output):
             self.post(self.gen(), output['channel'], output['user'])
@@ -101,9 +112,9 @@ class SimulatorBot(object):
         if self.counter % 3600 == 0:
           self.update_dict()
           self.post(self.gen(), "#random")
-    except Exception:
-      traceback.print_exc()
-      self.post(traceback.format_exc(), "#random")
+      except Exception:
+        traceback.print_exc()
+        self.post(traceback.format_exc(), "#random")
 
 
 if __name__ == '__main__':
