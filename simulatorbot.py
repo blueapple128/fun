@@ -13,7 +13,7 @@ AT_BOT = "<@" + BOT_ID + ">"
 VOCAB_FILE = os.environ['VOCAB_FILE']
 
 
-class SimulatorBot(object):
+class SimulatorBot:
   def __init__(self, vocab_file):
     self.cli = SlackClient(BOT_TOKEN)
     assert self.cli.rtm_connect()
@@ -23,7 +23,7 @@ class SimulatorBot(object):
     self.dict = {}
   
   def update_dict(self):
-    print 'Updating...'
+    print('Updating...')
     self.post('Diagnostic message: Currently updating vocab file, bot will be down for about 30 seconds', "#random")
     self.dict = {None: []}
     
@@ -70,7 +70,7 @@ class SimulatorBot(object):
     self.cli = SlackClient(BOT_TOKEN)
     assert self.cli.rtm_connect()
     
-    print 'Update done.'
+    print('Update done.')
     self.post('Diagnostic message: Finished updating vocab file and bot is back up', "#random")
   
   def gen(self):
@@ -84,7 +84,7 @@ class SimulatorBot(object):
       if word is None:
         break
       output.append(word)
-    return u' '.join(output)
+    return ' '.join(output)
   
   def post(self, msg, channel, to_user=None):
     self.cli.api_call("chat.postMessage",
@@ -103,7 +103,7 @@ class SimulatorBot(object):
       return False
   
   def run(self):
-    print 'Running'
+    print('Running')
     while True:
       try:
         # heroku ephemeral file support: if vocabulary doesn't exist, create it
