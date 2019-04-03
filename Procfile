@@ -1,3 +1,2 @@
-piazzabot: ruby piazzabot.rb
-simulatorbot: python simulatorbot.py
+bots: ruby piazzabot.rb & python simulatorbot.py && fg
 
