@@ -24,6 +24,8 @@ class SimulatorBot:
   
   def update_dict(self):
     print('Updating...')
+    # todo: time will vary depending on number of channels in the workspace and
+    # number of messages in the channel
     self.post('Diagnostic message: Currently updating vocab file, bot will be down for about 30 seconds', "#random")
     self.dict = {None: []}
     
