@@ -3,7 +3,6 @@ import random
 from ast import literal_eval
 import os
 import time
-import sys
 import traceback
 
 BOT_TOKEN = os.environ['SIMULATORBOT_TOKEN']
@@ -11,6 +10,7 @@ SEARCH_TOKEN = os.environ['SIMULATORBOT_SEARCH_TOKEN']
 BOT_ID = os.environ['SIMULATORBOT_ID']
 AT_BOT = "<@" + BOT_ID + ">"
 VOCAB_FILE = os.environ['VOCAB_FILE']
+WHITELISTED_NONPUBLIC_CHANNELS = os.environ['WHITELISTED_NONPUBLIC_CHANNELS'].split(',')
 
 
 class SimulatorBot:
@@ -36,8 +36,12 @@ class SimulatorBot:
     # channels; works for this workspace but may not work for other workspaces
     channels = cli2.api_call(
       "conversations.list",
-      types="public_channel,private_channel,im")['channels']
-    channel_ids = [c['id'] for c in channels]
+      types="public_channel,private_channel,mpim,im")['channels']
+    channel_ids = [
+      c['id']
+      for c in channels
+      if c['id'].startswith('C') or c['id'] in WHITELISTED_NONPUBLIC_CHANNELS
+    ]
     
     for cid in channel_ids:
       cursor = None
