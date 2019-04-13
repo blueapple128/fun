@@ -10,7 +10,10 @@ SEARCH_TOKEN = os.environ['SIMULATORBOT_SEARCH_TOKEN']
 BOT_ID = os.environ['SIMULATORBOT_ID']
 AT_BOT = "<@" + BOT_ID + ">"
 VOCAB_FILE = os.environ['VOCAB_FILE']
-WHITELISTED_NONPUBLIC_CHANNELS = os.environ['WHITELISTED_NONPUBLIC_CHANNELS'].split(',')
+WHITELISTED_NONPUBLIC_CHANNELS = (
+  os.environ['WHITELISTED_NONPUBLIC_CHANNELS'].split(',')
+)
+POST_FREQUENCY = 86400  # seconds
 
 
 class SimulatorBot:
@@ -121,8 +124,7 @@ class SimulatorBot:
             self.counter = 0
         time.sleep(1)
         self.counter += 1
-        # if the bot hasn't posted in 6 hours
-        if self.counter % (3600*6) == 0:
+        if self.counter % POST_FREQUENCY == 0:
           self.post(self.gen(), "#random")
       except Exception:
         traceback.print_exc()
