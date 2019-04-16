@@ -111,26 +111,38 @@ class SimulatorBot:
     except AssertionError:
       return False
   
-  def run(self):
+  def run(self, crash_count, recovered_traceback):
     print('Running')
+    if recovered_traceback:
+      self.post(recovered_traceback, "#random")
+      n_crashes = "1 crash" if crash_count == 1 else f"{crash_count} crashes"
+      self.post(f"{self.bot_name} has auto-recovered from {n_crashes}",
+        "#random")
     while True:
-      try:
-        # heroku ephemeral file support: if vocabulary doesn't exist, create it
-        if not os.path.isfile(self.vocab_file):
-          self.update_dict()
-        for output in self.cli.rtm_read():
-          if self.is_command(output):
-            self.post(self.gen(), output['channel'], output['user'])
-            self.counter = 0
-        time.sleep(1)
-        self.counter += 1
-        if self.counter % POST_FREQUENCY == 0:
-          self.post(self.gen(), "#random")
-      except Exception:
-        traceback.print_exc()
-        self.post(traceback.format_exc(), "#random")
+      # heroku ephemeral file support: if vocabulary doesn't exist, create it
+      if not os.path.isfile(self.vocab_file):
+        self.update_dict()
+      for output in self.cli.rtm_read():
+        if self.is_command(output):
+          self.post(self.gen(), output['channel'], output['user'])
+          self.counter = 0
+      time.sleep(1)
+      self.counter += 1
+      if self.counter % POST_FREQUENCY == 0:
+        self.post(self.gen(), "#random")
 
 
 if __name__ == '__main__':
-  SimulatorBot(VOCAB_FILE).run()
+  # on unavoidable crash (e.g. ConnectionError), reboot and reconnect the bot,
+  # saving the stack trace so the bot can post it upon reconnecting
+  crash_count = 0
+  recovered_traceback = None
+  while True:
+    try:
+      SimulatorBot(VOCAB_FILE).run(crash_count, recovered_traceback)
+    except Exception:
+      traceback.print_exc()
+      recovered_traceback = traceback.format_exc()
+      crash_count += 1
+      time.sleep(1)
 
