@@ -7,20 +7,19 @@ import traceback
 
 BOT_TOKEN = os.environ['SIMULATORBOT_TOKEN']
 SEARCH_TOKEN = os.environ['SIMULATORBOT_SEARCH_TOKEN']
-BOT_ID = os.environ['SIMULATORBOT_ID']
-AT_BOT = "<@" + BOT_ID + ">"
-VOCAB_FILE = os.environ['VOCAB_FILE']
 WHITELISTED_NONPUBLIC_CHANNELS = (
   os.environ['WHITELISTED_NONPUBLIC_CHANNELS'].split(',')
 )
 
 
 class SimulatorBot:
-  def __init__(self, vocab_file):
+  def __init__(self):
     self.cli = SlackClient(BOT_TOKEN)
     assert self.cli.rtm_connect()
-    self.bot_name = self.cli.api_call("users.info", user=BOT_ID)['user']['name']
-    self.vocab_file = vocab_file
+    auth = self.cli.api_call("auth.test")
+    self.bot_id = auth['user_id']
+    self.bot_name = auth['user']
+    self.vocab_file = f"{auth['team']}.vocab"
     self.dict = {}
   
   def update_dict(self):
@@ -105,8 +104,8 @@ class SimulatorBot:
     try:
       assert output['type'] == 'message'
       text = output.get('text', '').upper()
-      assert AT_BOT in text or self.bot_name.upper() in text
-      assert output['user'] != BOT_ID
+      assert f"<@{self.bot_id}>" in text or self.bot_name.upper() in text
+      assert output['user'] != self.bot_id
       return True
     except AssertionError:
       return False
@@ -135,7 +134,7 @@ if __name__ == '__main__':
   recovered_traceback = None
   while True:
     try:
-      SimulatorBot(VOCAB_FILE).run(crash_count, recovered_traceback)
+      SimulatorBot().run(crash_count, recovered_traceback)
     except Exception:
       traceback.print_exc()
       recovered_traceback = traceback.format_exc()
