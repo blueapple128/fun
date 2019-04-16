@@ -13,7 +13,6 @@ VOCAB_FILE = os.environ['VOCAB_FILE']
 WHITELISTED_NONPUBLIC_CHANNELS = (
   os.environ['WHITELISTED_NONPUBLIC_CHANNELS'].split(',')
 )
-POST_FREQUENCY = 86400  # seconds
 
 
 class SimulatorBot:
@@ -22,7 +21,6 @@ class SimulatorBot:
     assert self.cli.rtm_connect()
     self.bot_name = self.cli.api_call("users.info", user=BOT_ID)['user']['name']
     self.vocab_file = vocab_file
-    self.counter = 0
     self.dict = {}
   
   def update_dict(self):
@@ -125,11 +123,7 @@ class SimulatorBot:
       for output in self.cli.rtm_read():
         if self.is_command(output):
           self.post(self.gen(), output['channel'], output['user'])
-          self.counter = 0
       time.sleep(1)
-      self.counter += 1
-      if self.counter % POST_FREQUENCY == 0:
-        self.post(self.gen(), "#random")
 
 
 if __name__ == '__main__':
