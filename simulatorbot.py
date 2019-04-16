@@ -29,6 +29,10 @@ class SimulatorBot:
     self.bot_name = auth['user']
     self.vocab_file = f"{auth['team']}.vocab"
     self.dict = {}
+    self.user_id_to_name = {}
+    users = self.cli.api_call("users.list")['members']
+    for u in users:
+      self.user_id_to_name[u['id']] = u['profile']['display_name'] or u['profile']['real_name']
   
   def update_dict(self):
     print('Updating...')
@@ -60,16 +64,17 @@ class SimulatorBot:
         history = cli2.api_call("conversations.history", **kwargs)
         messages = history['messages']
         for m in messages:
-          words = m['text'].split()
-          if words:  # e.g. uploaded image is a message w/o text
-            self.dict[None].append(words[0])
-          for i in range(len(words)):
-            source_word = words[i]
-            dest_word = words[i+1] if i+1 in range(len(words)) else None
-            if source_word in self.dict:
-              self.dict[source_word].append(dest_word)
-            else:
-              self.dict[source_word] = [dest_word]
+          if 'subtype' not in m:  # ignore bot messages, join messages, etc.
+            words = m['text'].split()
+            if words:  # e.g. uploaded image is a message w/o text
+              self.dict[None].append(words[0])
+            for i in range(len(words)):
+              source_word = words[i]
+              dest_word = words[i+1] if i+1 in range(len(words)) else None
+              if source_word in self.dict:
+                self.dict[source_word].append(dest_word)
+              else:
+                self.dict[source_word] = [dest_word]
         if history['has_more']:
           cursor = history['response_metadata']['next_cursor']
         else:
@@ -89,6 +94,15 @@ class SimulatorBot:
       channel=response['channel'],
       ts=response['ts'])
   
+  def sanitize(self, msg):
+    """prevent bot from @mentioning people (distracting/annoying)"""
+    msg = msg.replace("<!here>", "@here")
+    msg = msg.replace("<!channel>", "@channel")
+    msg = msg.replace("<!everyone>", "@everyone")
+    for uid in self.user_id_to_name:
+      msg = msg.replace(f"<@{uid}>", f"@{self.user_id_to_name[uid]}")
+    return msg
+  
   def gen(self):
     with open(self.vocab_file, 'r') as f:
       self.dict = literal_eval(f.read())
@@ -100,7 +114,7 @@ class SimulatorBot:
       if word is None:
         break
       output.append(word)
-    return ' '.join(output)
+    return self.sanitize(' '.join(output))
   
   def post(self, msg, channel, to_user=None):
     return self.cli.api_call("chat.postMessage",
