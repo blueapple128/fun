@@ -27,7 +27,7 @@ class SimulatorBot:
     print('Updating...')
     # todo: time will vary depending on number of channels in the workspace and
     # number of messages in the channel
-    self.post('Diagnostic message: Currently updating vocab file, bot will be down for about 30 seconds', "#random")
+    response = self.post('Diagnostic message: Currently updating vocab file, bot will be down for about 30 seconds', "#random")
     self.dict = {None: []}
     
     cli2 = SlackClient(SEARCH_TOKEN)
@@ -78,7 +78,9 @@ class SimulatorBot:
     assert self.cli.rtm_connect()
     
     print('Update done.')
-    self.post('Diagnostic message: Finished updating vocab file and bot is back up', "#random")
+    self.cli.api_call("chat.delete",
+      channel=response['channel'],
+      ts=response['ts'])
   
   def gen(self):
     with open(self.vocab_file, 'r') as f:
@@ -94,10 +96,10 @@ class SimulatorBot:
     return ' '.join(output)
   
   def post(self, msg, channel, to_user=None):
-    self.cli.api_call("chat.postMessage",
-                 channel=channel,
-                 text=msg,
-                 as_user=True)
+    return self.cli.api_call("chat.postMessage",
+      channel=channel,
+      text=msg,
+      as_user=True)
   
   def is_command(self, output):
     try:
