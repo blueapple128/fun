@@ -4,11 +4,18 @@ from ast import literal_eval
 import os
 import time
 import traceback
+import sys
 
-BOT_TOKEN = os.environ['SIMULATORBOT_TOKEN']
-SEARCH_TOKEN = os.environ['SIMULATORBOT_SEARCH_TOKEN']
+# ad hoc way to set up multiple bot instances on different slack workspaces
+# The 'right' solution is to spin up more than one heroku app each with its own
+# set of config vars
+# But that would incur a charge :P
+assert len(sys.argv) == 2
+PREFIX = sys.argv[1].upper()
+BOT_TOKEN = os.environ[f'{PREFIX}_SIMULATORBOT_TOKEN']
+SEARCH_TOKEN = os.environ[f'{PREFIX}_SIMULATORBOT_SEARCH_TOKEN']
 WHITELISTED_NONPUBLIC_CHANNELS = (
-  os.environ['WHITELISTED_NONPUBLIC_CHANNELS'].split(',')
+  os.environ[f'{PREFIX}_WHITELISTED_NONPUBLIC_CHANNELS'].split(',')
 )
 
 
