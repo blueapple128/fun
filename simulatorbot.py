@@ -17,6 +17,7 @@ SEARCH_TOKEN = os.environ[f'{PREFIX}_SIMULATORBOT_SEARCH_TOKEN']
 WHITELISTED_NONPUBLIC_CHANNELS = (
   os.environ[f'{PREFIX}_WHITELISTED_NONPUBLIC_CHANNELS'].split(',')
 )
+DIAGNOSTIC_CHANNEL = "#_test"  # where to post update and crash recovery notices
 
 
 class SimulatorBot:
@@ -33,7 +34,7 @@ class SimulatorBot:
     print('Updating...')
     # todo: time will vary depending on number of channels in the workspace and
     # number of messages in the channel
-    response = self.post('Diagnostic message: Currently updating vocab file, bot will be down for about 30 seconds', "#random")
+    response = self.post('Diagnostic message: Currently updating vocab file, bot will be down for about 30 seconds', DIAGNOSTIC_CHANNEL)
     self.dict = {None: []}
     
     cli2 = SlackClient(SEARCH_TOKEN)
@@ -120,10 +121,10 @@ class SimulatorBot:
   def run(self, crash_count, recovered_traceback):
     print('Running')
     if recovered_traceback:
-      self.post(recovered_traceback, "#random")
+      self.post(recovered_traceback, DIAGNOSTIC_CHANNEL)
       n_crashes = "1 crash" if crash_count == 1 else f"{crash_count} crashes"
       self.post(f"{self.bot_name} has auto-recovered from {n_crashes}",
-        "#random")
+        DIAGNOSTIC_CHANNEL)
     while True:
       # heroku ephemeral file support: if vocabulary doesn't exist, create it
       if not os.path.isfile(self.vocab_file):
