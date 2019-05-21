@@ -34,28 +34,54 @@ class SimulatorBot:
     for u in users:
       self.user_id_to_name[u['id']] = u['profile']['display_name'] or u['profile']['real_name']
   
-  def update_dict(self):
+  def inform_update_start(self):
     print('Updating...')
     # todo: time will vary depending on number of channels in the workspace and
     # number of messages in the channel
-    response = self.post('Diagnostic message: Currently updating vocab file, bot will be down for about 30 seconds', DIAGNOSTIC_CHANNEL)
-    self.dict = {None: []}
-    
-    cli2 = SlackClient(SEARCH_TOKEN)
-    assert cli2.rtm_connect()
-    
+    return self.post('Diagnostic message: Currently updating vocab file, bot will be down for about 30 seconds', DIAGNOSTIC_CHANNEL)
+  
+  def allowed_channel_ids(self, cli2):
     # todo: pagination-insensitive API call assumes there are no more than 100
     # channels; works for this workspace but may not work for other workspaces
     channels = cli2.api_call(
       "conversations.list",
       types="public_channel,private_channel,mpim,im")['channels']
-    channel_ids = [
+    return [
       c['id']
       for c in channels
       if c['id'].startswith('C') or c['id'] in WHITELISTED_NONPUBLIC_CHANNELS
     ]
+  
+  def add_msg_to_vocab(self, msg):
+    words = msg.split()
+    if words:  # can have a msg w/o text, e.g. an uploaded image
+      self.dict[None].append(words[0])
+    for i in range(len(words)):
+      source_word = words[i]
+      dest_word = words[i+1] if i+1 in range(len(words)) else None
+      if source_word in self.dict:
+        self.dict[source_word].append(dest_word)
+      else:
+        self.dict[source_word] = [dest_word]
+  
+  def inform_update_end(self, response):
+    # patch: the websocket closes after being idle too long; sometimes the
+    # dictionary update takes long enough
+    self.cli = SlackClient(BOT_TOKEN)
+    assert self.cli.rtm_connect()
+    print('Update done.')
+    self.cli.api_call("chat.delete",
+      channel=response['channel'],
+      ts=response['ts'])
+  
+  def update_dict(self):
+    response = self.inform_update_start()
+    self.dict = {None: []}
     
-    for cid in channel_ids:
+    cli2 = SlackClient(SEARCH_TOKEN)
+    assert cli2.rtm_connect()
+    
+    for cid in self.allowed_channel_ids(cli2):
       cursor = None
       while True:
         kwargs = {'channel': cid, 'count': 1000}
@@ -65,16 +91,7 @@ class SimulatorBot:
         messages = history['messages']
         for m in messages:
           if 'subtype' not in m:  # ignore bot messages, join messages, etc.
-            words = m['text'].split()
-            if words:  # e.g. uploaded image is a message w/o text
-              self.dict[None].append(words[0])
-            for i in range(len(words)):
-              source_word = words[i]
-              dest_word = words[i+1] if i+1 in range(len(words)) else None
-              if source_word in self.dict:
-                self.dict[source_word].append(dest_word)
-              else:
-                self.dict[source_word] = [dest_word]
+            self.add_msg_to_vocab(m['text'])
         if history['has_more']:
           cursor = history['response_metadata']['next_cursor']
         else:
@@ -84,15 +101,7 @@ class SimulatorBot:
     with open(self.vocab_file, 'w') as f:
       f.write(str(self.dict))
     
-    # patch: the websocket closes after being idle too long; sometimes the
-    # dictionary update takes long enough
-    self.cli = SlackClient(BOT_TOKEN)
-    assert self.cli.rtm_connect()
-    
-    print('Update done.')
-    self.cli.api_call("chat.delete",
-      channel=response['channel'],
-      ts=response['ts'])
+    self.inform_update_end(response)
   
   def sanitize(self, msg):
     """prevent bot from @mentioning people (distracting/annoying)"""
