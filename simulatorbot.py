@@ -18,6 +18,7 @@ WHITELISTED_NONPUBLIC_CHANNELS = (
   os.environ[f'{PREFIX}_WHITELISTED_NONPUBLIC_CHANNELS'].split(',')
 )
 DIAGNOSTIC_CHANNEL = "#_test"  # where to post update and crash recovery notices
+BIGRAM_WEIGHT = 0.8
 
 
 class SimulatorBot:
@@ -52,10 +53,9 @@ class SimulatorBot:
       if c['id'].startswith('C') or c['id'] in WHITELISTED_NONPUBLIC_CHANNELS
     ]
   
-  def add_msg_to_vocab(self, msg):
-    words = msg.split()
-    if words:  # can have a msg w/o text, e.g. an uploaded image
-      self.dict[None].append(words[0])
+  def add_words_to_vocab(self, words):
+    # unigrams
+    self.dict[None].append(words[0])
     for i in range(len(words)):
       source_word = words[i]
       dest_word = words[i+1] if i+1 in range(len(words)) else None
@@ -63,6 +63,20 @@ class SimulatorBot:
         self.dict[source_word].append(dest_word)
       else:
         self.dict[source_word] = [dest_word]
+    
+    # bigrams
+    if len(words) >= 2:
+      if (None, words[0]) in self.dict:
+        self.dict[(None, words[0])].append(words[1])
+      else:
+        self.dict[(None, words[0])] = [words[1]]
+      for i in range(len(words) - 1):
+        source_words = (words[i], words[i+1])
+        dest_word = words[i+2] if i+2 in range(len(words)) else None
+        if source_words in self.dict:
+          self.dict[source_words].append(dest_word)
+        else:
+          self.dict[source_words] = [dest_word]
   
   def inform_update_end(self, response):
     # patch: the websocket closes after being idle too long; sometimes the
@@ -91,7 +105,9 @@ class SimulatorBot:
         messages = history['messages']
         for m in messages:
           if 'subtype' not in m:  # ignore bot messages, join messages, etc.
-            self.add_msg_to_vocab(m['text'])
+            words = m['text'].split()
+            if words:  # can have a msg w/o text, e.g. an uploaded image
+              self.add_words_to_vocab(words)
         if history['has_more']:
           cursor = history['response_metadata']['next_cursor']
         else:
@@ -113,15 +129,20 @@ class SimulatorBot:
     return msg
   
   def gen(self):
-    with open(self.vocab_file, 'r') as f:
-      self.dict = literal_eval(f.read())
+    if not self.dict:
+      with open(self.vocab_file, 'r') as f:
+        self.dict = literal_eval(f.read())
     
     output = []
-    word = None
+    inputs = (None, None)
     while True:
-      word = random.choice(self.dict[word])
+      if random.random() <= BIGRAM_WEIGHT and inputs in self.dict:
+        word = random.choice(self.dict[inputs])
+      else:
+        word = random.choice(self.dict[inputs[1]])
       if word is None:
         break
+      inputs = (inputs[1], word)
       output.append(word)
     return self.sanitize(' '.join(output))
   
