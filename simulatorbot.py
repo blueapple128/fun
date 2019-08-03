@@ -1,4 +1,5 @@
-from slackclient import SlackClient
+import slackclient
+import websocket
 import random
 from ast import literal_eval
 import os
@@ -23,7 +24,7 @@ BIGRAM_WEIGHT = 0.8
 
 class SimulatorBot:
   def __init__(self):
-    self.cli = SlackClient(BOT_TOKEN)
+    self.cli = slackclient.SlackClient(BOT_TOKEN)
     assert self.cli.rtm_connect()
     auth = self.cli.api_call("auth.test")
     self.bot_id = auth['user_id']
@@ -81,7 +82,7 @@ class SimulatorBot:
   def inform_update_end(self, response):
     # patch: the websocket closes after being idle too long; sometimes the
     # dictionary update takes long enough
-    self.cli = SlackClient(BOT_TOKEN)
+    self.cli = slackclient.SlackClient(BOT_TOKEN)
     assert self.cli.rtm_connect()
     print('Update done.')
     self.cli.api_call("chat.delete",
@@ -92,7 +93,7 @@ class SimulatorBot:
     response = self.inform_update_start()
     self.dict = {None: []}
     
-    cli2 = SlackClient(SEARCH_TOKEN)
+    cli2 = slackclient.SlackClient(SEARCH_TOKEN)
     assert cli2.rtm_connect()
     
     for cid in self.allowed_channel_ids(cli2):
@@ -162,13 +163,10 @@ class SimulatorBot:
     except AssertionError:
       return False
   
-  def run(self, crash_count, recovered_traceback):
+  def run(self, recovered_traceback):
     print('Running')
     if recovered_traceback:
       self.post(recovered_traceback, DIAGNOSTIC_CHANNEL)
-      n_crashes = "1 crash" if crash_count == 1 else f"{crash_count} crashes"
-      self.post(f"{self.bot_name} has auto-recovered from {n_crashes}",
-        DIAGNOSTIC_CHANNEL)
     while True:
       # heroku ephemeral file support: if vocabulary doesn't exist, create it
       if not os.path.isfile(self.vocab_file):
@@ -180,16 +178,17 @@ class SimulatorBot:
 
 
 if __name__ == '__main__':
-  # on unavoidable crash (e.g. ConnectionError), reboot and reconnect the bot,
-  # saving the stack trace so the bot can post it upon reconnecting
-  crash_count = 0
+  # on crash, wait a little then reconnect the bot
   recovered_traceback = None
   while True:
     try:
-      SimulatorBot().run(crash_count, recovered_traceback)
+      SimulatorBot().run(recovered_traceback)
+    except (slackclient.server.SlackConnectionError, websocket._exceptions.WebSocketException):
+      # happens at random, unavoidable, don't bother saving the stack trace
+      time.sleep(1)
     except Exception:
+      # 'actual' problem; save and post it upon reconnecting
       traceback.print_exc()
       recovered_traceback = traceback.format_exc()
-      crash_count += 1
       time.sleep(1)
 
