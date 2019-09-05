@@ -31,16 +31,16 @@ def invalid?(data)
 end
 
 def msg(channel, text)
-  $cl.web_client.chat_postMessage channel: channel, text: text, as_user: false, username: "piazzabot"
+  $cl.web_client.chat_postMessage channel: channel, text: text, as_user: false, username: "campuswirebot"
 end
 
 $cl.on :message do |data|
   begin
     next if invalid?(data)
     
-    match = /(?:^|\W)@(\d{1,4})\b/.match(data.text)
+    match = /(?:^|\W)#(\d{1,4})\b/.match(data.text)
     if match
-      msg(data.channel, "https://piazza.com/class/jr3smt7pw363hn?cid=#{match[1]}")
+      msg(data.channel, "https://campuswire.com/c/G8FE6D09F/feed/#{match[1]}")
     end
   rescue StandardError => e
     exception = ([e.inspect] + e.backtrace.select { |line| !line.include? ".rvm" }).join("\n")
