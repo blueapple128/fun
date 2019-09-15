@@ -7,7 +7,13 @@
 # autocycle airplane mode.
 
 loop do
-  out = `ping github.com -c 1 -w 1`
+  out = ""
+  t = Thread.new { out = `ping github.com -c 1 -w 1` }
+  sleep 0.01
+  if t.status
+    sleep 3
+    t.exit
+  end
   if out.empty?
     puts 'Enabling airplane mode'
     `nmcli r all off`
